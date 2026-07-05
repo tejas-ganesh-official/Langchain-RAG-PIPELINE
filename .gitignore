@@ -1,0 +1,15 @@
+# virtual envs
+.venv/
+.venv-1/
+
+# ChromaDB persisted data
+data/vector_store/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# VS Code
+.vscode/
