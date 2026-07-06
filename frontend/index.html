@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ragpicker</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:         #0b0d13;
+      --surface:    #14161f;
+      --surface-2:  #1a1d27;
+      --border:     #262a38;
+      --accent:     #7c6af7;
+      --accent-2:   #a78bfa;
+      --accent-dim: #4b4299;
+      --text:       #e6e8f2;
+      --text-muted: #6b7280;
+      --user-bg:    #221f3d;
+      --bot-bg:     #14161f;
+      --green:      #34d399;
+      --danger:     #f87171;
+      --radius:     14px;
+      --font:       'Inter', -apple-system, system-ui, sans-serif;
+      --mono:       'JetBrains Mono', ui-monospace, monospace;
+    }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(600px circle at 15% 10%, rgba(124,106,247,0.10), transparent 40%),
+        radial-gradient(500px circle at 85% 90%, rgba(167,139,250,0.08), transparent 40%);
+      pointer-events: none;
+      z-index: 0;
+      animation: drift 18s ease-in-out infinite alternate;
+    }
+    @keyframes drift {
+      0%   { transform: translate(0, 0); }
+      100% { transform: translate(-20px, 20px); }
+    }
+
+    header {
+      position: relative; z-index: 2;
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 24px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(20,22,31,0.7);
+      backdrop-filter: blur(12px);
+      flex-shrink: 0;
+    }
+    header .logo { font-size: 20px; font-weight: 800; letter-spacing: -0.5px; position: relative; }
+    header .logo span {
+      background: linear-gradient(90deg, var(--accent), var(--accent-2));
+      -webkit-background-clip: text; background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    header .logo::after {
+      content: ''; position: absolute; left: 0; right: 0; bottom: -6px; height: 14px;
+      background: radial-gradient(60% 100% at 50% 0%, rgba(124,106,247,0.5), transparent 70%);
+      filter: blur(6px); opacity: 0.7; animation: pulse 3s ease-in-out infinite;
+    }
+    @keyframes pulse { 50% { opacity: 0.25; } }
+    header .pill {
+      margin-left: auto; font-size: 11px;
+      background: rgba(75,66,153,0.4); border: 1px solid var(--accent-dim);
+      color: #c4bfff; padding: 4px 11px; border-radius: 99px; font-weight: 600;
+      display: flex; align-items: center; gap: 6px;
+    }
+    header .pill .dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--green); box-shadow: 0 0 8px var(--green); animation: pulse 2s infinite;
+    }
+
+    .layout { position: relative; z-index: 1; display: flex; flex: 1; overflow: hidden; }
+
+    .left {
+      width: 300px; min-width: 260px;
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      background: rgba(20,22,31,0.5); backdrop-filter: blur(8px);
+      flex-shrink: 0;
+    }
+    .panel-title {
+      font-size: 11px; font-weight: 600; letter-spacing: 0.09em;
+      text-transform: uppercase; color: var(--text-muted); padding: 16px 18px 8px;
+    }
+    .drop-zone {
+      margin: 0 14px; border: 2px dashed var(--border); border-radius: var(--radius);
+      padding: 26px 16px; text-align: center; cursor: pointer;
+      transition: all 0.25s; flex-shrink: 0;
+    }
+    .drop-zone:hover, .drop-zone.drag-over {
+      border-color: var(--accent); background: rgba(124,106,247,0.08); transform: translateY(-1px);
+    }
+    .drop-zone .icon { font-size: 26px; margin-bottom: 8px; }
+    .drop-zone p { font-size: 13px; color: var(--text-muted); line-height: 1.5; }
+    .drop-zone p strong { color: var(--text); }
+    .drop-zone input { display: none; }
+
+    #upload-status { margin: 8px 14px 0; font-size: 12px; color: var(--green); min-height: 18px; padding: 0 4px; }
+
+    .file-list-wrap { flex: 1; overflow-y: auto; padding: 4px 14px 14px; }
+    .file-list-wrap::-webkit-scrollbar { width: 5px; }
+    .file-list-wrap::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    .file-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 10px; border-radius: 9px; font-size: 13px;
+      color: var(--text); border: 1px solid var(--border);
+      margin-bottom: 6px; background: var(--bg);
+      word-break: break-all; transition: border-color 0.2s; animation: slideIn 0.3s ease;
+    }
+    .file-item:hover { border-color: var(--accent-dim); }
+    .file-item .ext {
+      font-size: 10px; font-weight: 700; background: var(--accent-dim);
+      color: #c4bfff; padding: 2px 6px; border-radius: 4px; flex-shrink: 0;
+    }
+    @keyframes slideIn { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: none; } }
+    .no-files { font-size: 13px; color: var(--text-muted); padding: 6px 4px; }
+
+    .right { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+
+    .messages { flex: 1; overflow-y: auto; padding: 26px 30px; display: flex; flex-direction: column; gap: 20px; }
+    .messages::-webkit-scrollbar { width: 6px; }
+    .messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    .msg { display: flex; flex-direction: column; max-width: 80%; animation: msgIn 0.35s cubic-bezier(0.22,1,0.36,1); }
+    .msg.user { align-self: flex-end; align-items: flex-end; }
+    .msg.bot  { align-self: flex-start; align-items: flex-start; }
+    @keyframes msgIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+    .bubble { padding: 13px 17px; border-radius: var(--radius); font-size: 14px; line-height: 1.7; word-break: break-word; }
+    .msg.user .bubble {
+      background: linear-gradient(135deg, var(--user-bg), #1c1a33);
+      border: 1px solid var(--accent-dim); border-bottom-right-radius: 4px;
+    }
+    .msg.bot .bubble { background: var(--bot-bg); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+    .bubble p { margin: 0 0 8px; }
+    .bubble p:last-child { margin-bottom: 0; }
+    .bubble ul, .bubble ol { margin: 6px 0 8px; padding-left: 20px; }
+    .bubble li { margin: 3px 0; }
+    .bubble code { font-family: var(--mono); font-size: 12.5px; background: rgba(124,106,247,0.14); padding: 1px 6px; border-radius: 5px; }
+    .bubble pre { background: #0d0f16; border: 1px solid var(--border); border-radius: 9px; padding: 12px 14px; overflow-x: auto; margin: 8px 0; }
+    .bubble pre code { background: none; padding: 0; }
+    .bubble strong { color: #fff; font-weight: 700; }
+
+    .tag { display: inline-flex; align-items: center; gap: 6px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.05em; color: var(--accent-2); margin-bottom: 6px; text-transform: lowercase; }
+    .tag.working { color: var(--accent); }
+    .tag.working::before {
+      content: ''; width: 7px; height: 7px; border-radius: 50%;
+      background: var(--accent); box-shadow: 0 0 8px var(--accent); animation: pulse 1s infinite;
+    }
+
+    .bot-actions { margin-top: 8px; display: flex; gap: 8px; opacity: 0; transition: opacity 0.2s; }
+    .msg.bot:hover .bot-actions { opacity: 1; }
+    .copy-btn { font-size: 11px; color: var(--text-muted); background: none; border: 1px solid var(--border); border-radius: 7px; padding: 3px 9px; cursor: pointer; transition: all 0.2s; font-family: var(--font); }
+    .copy-btn:hover { color: var(--text); border-color: var(--accent-dim); }
+
+    .citations { margin-top: 9px; font-size: 11px; color: var(--text-muted); border-top: 1px solid var(--border); padding-top: 7px; }
+
+    .cursor::after { content: '▋'; animation: blink 0.7s step-end infinite; color: var(--accent); }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    .empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-muted); gap: 16px; font-size: 14px; }
+    .empty .big { font-size: 40px; animation: float 4s ease-in-out infinite; }
+    @keyframes float { 50% { transform: translateY(-8px); } }
+    .suggestions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; max-width: 460px; }
+    .chip { font-size: 13px; color: var(--text); background: var(--surface-2); border: 1px solid var(--border); border-radius: 99px; padding: 8px 16px; cursor: pointer; transition: all 0.2s; }
+    .chip:hover { border-color: var(--accent); background: rgba(124,106,247,0.1); transform: translateY(-1px); }
+
+    .input-wrap { border-top: 1px solid var(--border); background: rgba(20,22,31,0.7); backdrop-filter: blur(12px); padding: 12px 20px 16px; flex-shrink: 0; }
+    .attach-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+    .attach-row:empty { display: none; }
+    .attach-chip { display: flex; align-items: center; gap: 7px; font-size: 12px; background: var(--surface-2); border: 1px solid var(--accent-dim); border-radius: 9px; padding: 5px 8px 5px 10px; animation: slideIn 0.2s; }
+    .attach-chip .ext { font-size: 9px; font-weight: 700; color: var(--accent-2); }
+    .attach-chip .x { cursor: pointer; color: var(--text-muted); font-size: 15px; line-height: 1; padding: 0 2px; transition: color 0.2s; }
+    .attach-chip .x:hover { color: var(--danger); }
+
+    .input-bar { display: flex; gap: 10px; align-items: flex-end; }
+    .icon-btn { background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px; color: var(--text-muted); cursor: pointer; width: 44px; height: 44px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 22px; transition: all 0.2s; }
+    .icon-btn:hover { color: var(--accent-2); border-color: var(--accent-dim); background: rgba(124,106,247,0.1); }
+
+    .input-bar textarea { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; color: var(--text); font-family: var(--font); font-size: 14px; padding: 11px 15px; resize: none; outline: none; height: 44px; max-height: 150px; line-height: 1.5; transition: border-color 0.2s; }
+    .input-bar textarea:focus { border-color: var(--accent); }
+    .input-bar textarea::placeholder { color: var(--text-muted); }
+
+    .send-btn { background: linear-gradient(135deg, var(--accent), var(--accent-2)); border: none; border-radius: 12px; color: #fff; cursor: pointer; font-size: 17px; width: 44px; height: 44px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: all 0.2s; box-shadow: 0 4px 14px rgba(124,106,247,0.35); }
+    .send-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(124,106,247,0.5); }
+    .send-btn.stop { background: linear-gradient(135deg, var(--danger), #dc2626); box-shadow: 0 4px 14px rgba(248,113,113,0.35); }
+
+    .drag-overlay { position: fixed; inset: 0; z-index: 100; background: rgba(11,13,19,0.85); backdrop-filter: blur(6px); display: none; align-items: center; justify-content: center; pointer-events: none; }
+    .drag-overlay.show { display: flex; animation: fadeIn 0.15s; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .drag-overlay .box { border: 2.5px dashed var(--accent); border-radius: 24px; padding: 60px 80px; text-align: center; background: rgba(124,106,247,0.06); }
+    .drag-overlay .box .big { font-size: 48px; margin-bottom: 12px; }
+    .drag-overlay .box p { font-size: 17px; color: var(--text); font-weight: 600; }
+  .model-select-wrap {
+      display: flex; align-items: center; gap: 8px; margin-left: 12px;
+    }
+    .model-select-wrap label { font-size: 11px; color: var(--text-muted); font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }
+    #model-select {
+      background: rgba(75,66,153,0.25); border: 1px solid var(--accent-dim);
+      color: var(--text); border-radius: 8px; font-size: 12px; font-family: var(--font);
+      padding: 4px 28px 4px 10px; cursor: pointer; outline: none;
+      appearance: none; -webkit-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%237c6af7'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 8px center;
+      transition: border-color 0.2s;
+    }
+    #model-select:hover { border-color: var(--accent); }
+    #model-select option { background: #1a1d27; color: var(--text); }
+    .swap-status { font-size: 11px; color: var(--green); min-width: 60px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">rag<span>picker</span></div>
+  <div class="pill"><span class="dot"></span>Qwen 2.5 · Local</div>
+  <div class="model-select-wrap">
+    <label>Model</label>
+    <select id="model-select"><option>loading…</option></select>
+    <span class="swap-status" id="swap-status"></span>
+  </div>
+</header>
+
+<div class="layout">
+  <div class="left">
+    <div class="panel-title">Documents</div>
+    <div class="drop-zone" id="drop-zone">
+      <div class="icon">📂</div>
+      <p><strong>Drop files here</strong><br>or click to browse</p>
+      <input type="file" id="file-input-side" multiple
+             accept=".pdf,.txt,.md,.csv,.json,.docx,.doc,.xlsx,.xls,.pptx,.ppt" />
+    </div>
+    <div id="upload-status"></div>
+    <div class="file-list-wrap">
+      <div class="panel-title" style="padding-top:12px">In the pile</div>
+      <div id="file-list"><div class="no-files">No files yet.</div></div>
+    </div>
+  </div>
+
+  <div class="right">
+    <div class="messages" id="messages">
+      <div class="empty" id="empty-state">
+        <div class="big">🪄</div>
+        <div>Ask anything — or add files to conjure from.</div>
+        <div class="suggestions">
+          <div class="chip" data-q="What's in the pile?">What's in the pile?</div>
+          <div class="chip" data-q="Summarize my documents in a few lines.">Summarize my documents</div>
+          <div class="chip" data-q="What are the key points across all files?">Key points</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="input-wrap">
+      <div class="attach-row" id="attach-row"></div>
+      <div class="input-bar">
+        <button class="icon-btn" id="attach-btn" title="Attach files">＋</button>
+        <input type="file" id="file-input-main" multiple style="display:none"
+               accept=".pdf,.txt,.md,.csv,.json,.docx,.doc,.xlsx,.xls,.pptx,.ppt" />
+        <textarea id="input" placeholder="Ask a question…" rows="1"></textarea>
+        <button class="send-btn" id="send-btn" title="Send">&#9658;</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="drag-overlay" id="drag-overlay">
+  <div class="box">
+    <div class="big">📎</div>
+    <p>Drop to add to the pile</p>
+  </div>
+</div>
+
+<script>
+  const API = 'http://localhost:8000';
+
+  function renderMarkdown(t) {
+    let s = t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    s = s.replace(/```([\s\S]*?)```/g, (_, c) => `<pre><code>${c.trim()}</code></pre>`);
+    s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
+    s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    s = s.replace(/(?:^|\n)((?:\s*[-*]\s.+(?:\n|$))+)/g, (m, block) => {
+      const items = block.trim().split('\n').map(l => l.replace(/^\s*[-*]\s/, '').trim());
+      return '\n<ul>' + items.map(i => `<li>${i}</li>`).join('') + '</ul>';
+    });
+    s = s.split(/\n{2,}/).map(p =>
+      p.match(/^<(ul|ol|pre)/) ? p : `<p>${p.replace(/\n/g, '<br>')}</p>`
+    ).join('');
+    return s;
+  }
+
+  function extOf(name) { return (name.split('.').pop() || '').toUpperCase(); }
+
+  const dropZone     = document.getElementById('drop-zone');
+  const fileInputSide= document.getElementById('file-input-side');
+  const fileInputMain= document.getElementById('file-input-main');
+  const attachBtn    = document.getElementById('attach-btn');
+  const fileList     = document.getElementById('file-list');
+  const uploadStatus = document.getElementById('upload-status');
+  const attachRow    = document.getElementById('attach-row');
+  const dragOverlay  = document.getElementById('drag-overlay');
+
+  dropZone.addEventListener('click', () => fileInputSide.click());
+  attachBtn.addEventListener('click', () => fileInputMain.click());
+
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault(); dropZone.classList.remove('drag-over');
+    uploadFiles(e.dataTransfer.files);
+  });
+
+  fileInputSide.addEventListener('change', () => uploadFiles(fileInputSide.files));
+  fileInputMain.addEventListener('change', () => uploadFiles(fileInputMain.files));
+
+  let dragDepth = 0;
+  window.addEventListener('dragenter', e => { e.preventDefault(); dragDepth++; dragOverlay.classList.add('show'); });
+  window.addEventListener('dragover',  e => e.preventDefault());
+  window.addEventListener('dragleave', () => { dragDepth--; if (dragDepth <= 0) { dragDepth = 0; dragOverlay.classList.remove('show'); } });
+  window.addEventListener('drop', e => {
+    e.preventDefault(); dragDepth = 0; dragOverlay.classList.remove('show');
+    if (e.target.closest('#drop-zone')) return;
+    if (e.dataTransfer.files.length) uploadFiles(e.dataTransfer.files);
+  });
+
+  async function uploadFiles(files) {
+    if (!files.length) return;
+    const chips = [];
+    for (const f of files) {
+      const chip = document.createElement('div');
+      chip.className = 'attach-chip';
+      chip.innerHTML = `<span class="ext">${extOf(f.name)}</span>${f.name} <span class="x">×</span>`;
+      chip.querySelector('.x').addEventListener('click', () => chip.remove());
+      attachRow.appendChild(chip);
+      chips.push(chip);
+    }
+    uploadStatus.textContent = 'Adding to the pile…';
+    const fd = new FormData();
+    for (const f of files) fd.append('files', f);
+    try {
+      const res  = await fetch(`${API}/upload`, { method: 'POST', body: fd });
+      const data = await res.json();
+      uploadStatus.textContent = data.message;
+      setTimeout(() => uploadStatus.textContent = '', 4000);
+      loadFileList();
+    } catch {
+      uploadStatus.textContent = 'Upload failed.';
+    } finally {
+      setTimeout(() => chips.forEach(c => c.remove()), 1500);
+    }
+  }
+
+  async function loadFileList() {
+    try {
+      const res  = await fetch(`${API}/files`);
+      const data = await res.json();
+      if (!data.files.length) { fileList.innerHTML = '<div class="no-files">No files yet.</div>'; return; }
+      fileList.innerHTML = data.files.map(f =>
+        `<div class="file-item"><span class="ext">${extOf(f)}</span>${f}</div>`
+      ).join('');
+    } catch {}
+  }
+  loadFileList();
+
+  const messagesEl = document.getElementById('messages');
+  const emptyState = document.getElementById('empty-state');
+  const inputEl    = document.getElementById('input');
+  const sendBtn    = document.getElementById('send-btn');
+
+  let controller = null;
+  let streaming  = false;
+  let stickBottom = true;
+
+  messagesEl.addEventListener('scroll', () => {
+    stickBottom = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 80;
+  });
+  function scrollIfSticky() { if (stickBottom) messagesEl.scrollTop = messagesEl.scrollHeight; }
+
+  function hideEmpty() { if (emptyState) emptyState.style.display = 'none'; }
+  function escHtml(t) { return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  function appendBot() {
+    hideEmpty();
+    const wrap = document.createElement('div');
+    wrap.className = 'msg bot';
+    wrap.innerHTML = `<div class="tag working" id="bot-tag">conjuring…</div><div class="bubble cursor" id="bot-bubble"></div>`;
+    messagesEl.appendChild(wrap);
+    scrollIfSticky();
+    return wrap;
+  }
+
+  function setSendMode(mode) {
+    if (mode === 'stop') { sendBtn.classList.add('stop'); sendBtn.innerHTML = '&#9632;'; sendBtn.title = 'Stop'; }
+    else { sendBtn.classList.remove('stop'); sendBtn.innerHTML = '&#9658;'; sendBtn.title = 'Send'; }
+  }
+
+  async function sendMessage() {
+    if (streaming) { if (controller) controller.abort(); return; }
+
+    const text = inputEl.value.trim();
+    if (!text) return;
+
+    inputEl.value = '';
+    inputEl.style.height = '44px';
+    stickBottom = true;
+
+    const uWrap = document.createElement('div');
+    uWrap.className = 'msg user';
+    uWrap.innerHTML = `<div class="bubble">${escHtml(text)}</div>`;
+    hideEmpty(); messagesEl.appendChild(uWrap);
+
+    const botWrap = appendBot();
+    const bubble  = botWrap.querySelector('#bot-bubble');
+    const tag     = botWrap.querySelector('#bot-tag');
+
+    let fromDocs = false, sources = [], buffer = '', metaParsed = false;
+
+    streaming = true; setSendMode('stop');
+    controller = new AbortController();
+
+    try {
+      const res = await fetch(`${API}/chat/stream`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text }),
+        signal: controller.signal,
+      });
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const raw = decoder.decode(value);
+        for (const line of raw.split('\n')) {
+          if (!line.startsWith('data: ')) continue;
+          const payload = line.slice(6);
+          if (payload === '__done__') break;
+          if (!metaParsed && payload.startsWith('__meta__:')) {
+            const parts = payload.split(':');
+            fromDocs = parts[1] === 'true';
+            sources  = parts[2] ? parts[2].split(',').filter(Boolean) : [];
+            metaParsed = true;
+            continue;
+          }
+          buffer += payload;
+          bubble.innerHTML = renderMarkdown(buffer);
+          scrollIfSticky();
+        }
+      }
+    } catch (e) {
+      if (e.name === 'AbortError') { buffer += ' ⏹'; bubble.innerHTML = renderMarkdown(buffer); }
+      else { bubble.textContent = 'Error connecting to server.'; }
+    }
+
+    tag.classList.remove('working');
+    tag.textContent = 'conjured!';
+    bubble.classList.remove('cursor');
+    bubble.removeAttribute('id');
+
+    const actions = document.createElement('div');
+    actions.className = 'bot-actions';
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'copy-btn';
+    copyBtn.textContent = 'Copy';
+    copyBtn.addEventListener('click', () => {
+      navigator.clipboard.writeText(buffer);
+      copyBtn.textContent = 'Copied!';
+      setTimeout(() => copyBtn.textContent = 'Copy', 1500);
+    });
+    actions.appendChild(copyBtn);
+    botWrap.appendChild(actions);
+
+    if (fromDocs && sources.length) {
+      const cite = document.createElement('div');
+      cite.className = 'citations';
+      cite.textContent = 'Sources: ' + sources.join(', ');
+      botWrap.appendChild(cite);
+    }
+
+    scrollIfSticky();
+    streaming = false; setSendMode('send');
+    controller = null;
+    inputEl.focus();
+  }
+
+  sendBtn.addEventListener('click', sendMessage);
+  inputEl.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  });
+  inputEl.addEventListener('input', () => {
+    inputEl.style.height = '44px';
+    inputEl.style.height = Math.min(inputEl.scrollHeight, 150) + 'px';
+  });
+
+  document.querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', () => { inputEl.value = chip.dataset.q; sendMessage(); });
+  });
+
+  // ── model selector ──────────────────────────────────────────────────────────
+  const modelSelect  = document.getElementById('model-select');
+  const swapStatus   = document.getElementById('swap-status');
+
+  async function loadModels() {
+    try {
+      const res  = await fetch(`${API}/models`);
+      const data = await res.json();
+      modelSelect.innerHTML = '';
+      if (!data.models.length) {
+        modelSelect.innerHTML = '<option>no models found</option>';
+        return;
+      }
+      data.models.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m; opt.textContent = m;
+        if (m === data.current) opt.selected = true;
+        modelSelect.appendChild(opt);
+      });
+    } catch {
+      modelSelect.innerHTML = '<option>Ollama offline</option>';
+    }
+  }
+
+  modelSelect.addEventListener('change', async () => {
+    const model = modelSelect.value;
+    swapStatus.textContent = 'swapping…';
+    swapStatus.style.color = 'var(--text-muted)';
+    try {
+      const res  = await fetch(`${API}/model`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model }),
+      });
+      const data = await res.json();
+      if (data.status === 'ok') {
+        swapStatus.textContent = 'ready ✓';
+        swapStatus.style.color = 'var(--green)';
+      } else {
+        swapStatus.textContent = 'failed ✗';
+        swapStatus.style.color = 'var(--danger)';
+      }
+    } catch {
+      swapStatus.textContent = 'error ✗';
+      swapStatus.style.color = 'var(--danger)';
+    }
+    setTimeout(() => swapStatus.textContent = '', 2500);
+  });
+
+  loadModels();
+</script>
+</body>
+</html>

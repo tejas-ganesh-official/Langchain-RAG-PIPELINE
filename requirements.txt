@@ -9,3 +9,6 @@ sentence-transformers
 chromadb
 faiss-cpu
 unstructured
+fastapi
+uvicorn
+python-multipart

@@ -35,10 +35,13 @@ class VectorStore:
             os.makedirs(self.persist_directory, exist_ok=True)
             self.client = chromadb.PersistentClient(path=self.persist_directory)
 
-            # Get or create collection
+            # Get or create collection (cosine distance for normalized similarity)
             self.collection = self.client.get_or_create_collection(
                 name=self.collection_name,
-                metadata={"description": "PDF document embeddings for RAG"},
+                metadata={
+                    "description": "PDF document embeddings for RAG",
+                    "hnsw:space": "cosine",
+                },
             )
             print(f"Vector store initialized. Collection: {self.collection_name}")
             print(f"Existing documents in collection: {self.collection.count()}")
